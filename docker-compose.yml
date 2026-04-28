@@ -1,0 +1,136 @@
+services:
+
+  # ─── POSTS SERVICE ────────────────────────────────────────────────────────
+
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - instagram_network
+
+  posts:
+    build: ./posts-service
+    ports:
+      - "8000:8000"
+    env_file: ./posts-service/.env
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - instagram_network
+
+  # ─── USERS / AUTH SERVICE ─────────────────────────────────────────────────
+
+  users-init:
+    image: python:3.12-slim
+    volumes:
+      - keys:/app/keys
+      - ./SocialMediaUsersAPI/init.py:/init.py
+    command: sh -c "pip install cryptography -q && python3 /init.py"
+    networks:
+      - instagram_network
+
+  users-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "1434:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "${DB_PASSWORD}" -C -Q "SELECT 1"
+      interval: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - instagram_network
+
+  users-migrate:
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    volumes:
+      - ./SocialMediaUsersAPI:/app
+    working_dir: /app
+    command: "sh -c 'dotnet tool install --global dotnet-ef; dotnet nuget locals all --clear && dotnet restore && /root/.dotnet/tools/dotnet-ef database update'"
+    environment:
+      ConnectionStrings__DefaultConnection: "Data Source=users-db,1433;User Id=sa;Password=${DB_PASSWORD};Initial Catalog=SocialMediaUsers;Connect Timeout=30;Encrypt=False;TrustServerCertificate=True;ApplicationIntent=ReadWrite;MultiSubnetFailover=False;"
+    depends_on:
+      users-db:
+        condition: service_healthy
+      users-init:
+        condition: service_completed_successfully
+    networks:
+      - instagram_network
+
+  users:
+    build: ./SocialMediaUsersAPI
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Jwt__PublicKeyPath: "keys/public.pem"
+      Jwt__PrivateKeyPath: "keys/private.pem"
+      ConnectionStrings__DefaultConnection: "Data Source=users-db,1433;User Id=sa;Password=${DB_PASSWORD};Initial Catalog=SocialMediaUsers;Connect Timeout=30;Encrypt=False;TrustServerCertificate=True;ApplicationIntent=ReadWrite;MultiSubnetFailover=False;"
+    volumes:
+      - keys:/app/keys
+    depends_on:
+      users-migrate:
+        condition: service_completed_successfully
+    networks:
+      - instagram_network
+
+  # ─── MESSAGES SERVICE ─────────────────────────────────────────────────────
+
+  messages-db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME:-messaging}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-messaging}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - instagram_network
+
+  messages:
+    build: ./software-architecture-message-service
+    ports:
+      - "3000:3000"
+    env_file: ./software-architecture-message-service/.env
+    environment:
+      DB_HOST: messages-db
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      messages-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - instagram_network
+
+networks:
+  instagram_network:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  mssql_data:
+  postgres_data:
+  keys:
