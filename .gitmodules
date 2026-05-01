@@ -1,12 +1,15 @@
 [submodule "posts-service"]
 	path = posts-service
 	url = https://github.com/EthanWuzer/posts-service
+	branch = main
 [submodule "SocialMediaUsersAPI"]
 	path = SocialMediaUsersAPI
 	url = https://github.com/BrandonBelz/SocialMediaUsersAPI
 [submodule "software-architecture-project-frontend"]
 	path = software-architecture-project-frontend
 	url = https://github.com/Bluemaster05/software-architecture-project-frontend
+	branch = main
 [submodule "software-architecture-message-service"]
 	path = software-architecture-message-service
 	url = https://github.com/Agent8Bit/software-architecture-message-service
+	branch = main
