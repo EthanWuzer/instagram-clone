@@ -80,6 +80,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       Jwt__PublicKeyPath: "keys/public.pem"
       Jwt__PrivateKeyPath: "keys/private.pem"
+      Auth__ApiKey: ${API_KEY}
       ConnectionStrings__DefaultConnection: "Data Source=users-db,1433;User Id=sa;Password=${DB_PASSWORD};Initial Catalog=SocialMediaUsers;Connect Timeout=30;Encrypt=False;TrustServerCertificate=True;ApplicationIntent=ReadWrite;MultiSubnetFailover=False;"
     volumes:
       - keys:/app/keys
