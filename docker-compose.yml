@@ -25,6 +25,8 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+    volumes:
+      - posts_uploads:/app/uploads
     networks:
       - instagram_network
 
@@ -119,6 +121,7 @@ services:
     environment:
       DB_HOST: messages-db
       DB_PASSWORD: ${DB_PASSWORD}
+      USERS_API_KEY: ${API_KEY}
     depends_on:
       messages-db:
         condition: service_healthy
@@ -135,3 +138,4 @@ volumes:
   mssql_data:
   postgres_data:
   keys:
+  posts_uploads:
